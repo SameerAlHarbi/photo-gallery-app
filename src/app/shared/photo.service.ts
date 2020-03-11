@@ -1,53 +1,41 @@
-import { Injectable, ɵConsole } from '@angular/core';
-import { Platform } from '@ionic/angular';
-import { Plugins, CameraPhoto , CameraResultType, CameraSource, FilesystemDirectory} from '@capacitor/core';
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
-import { PhotoModel } from './photo.model';
-
-const { Camera } = Plugins;
+import { Plugins , CameraResultType, CameraSource} from '@capacitor/core';
 
 @Injectable({
     providedIn: 'root'
 })
 export class PhotoService {
 
-    photos: PhotoModel[] = [];
-    private PHOTO_STORAGE = 'photos';
+    inspectUrl = 'http://smart-miniral-api.herokuapp.com/inspect';
 
-    constructor(private platform: Platform) { }
+    constructor(private http: HttpClient) { }
 
-    async loadSavedImages() {
-        // Retrieve cached photo array data
-        const photosInStorage = await Plugins.Storage.get({ key: this.PHOTO_STORAGE });
-        this.photos = JSON.parse(photosInStorage.value) || [];
+    async inspectImage() {
 
-        if (!this.platform.is('hybrid')) {
-            for (const photo of this.photos) {
-                // Read each saved photo's data from the Filesystem
-                const readFile = await Plugins.Filesystem.readFile({
-                    path: photo.filepath,
-                    directory: FilesystemDirectory.Data
-                });
-
-                // Web platform only: Save the photo into the base64 field
-                photo.base64 = `data:image/jpeg;base64,${readFile.data}`;
-              }
-
-            console.log(this.photos);
-        }
-    }
-
-    async saveToGallery() {
-
-        const capturedPhoto = await Camera.getPhoto({
+        const capturedPhoto = await Plugins.Camera.getPhoto({
             resultType: CameraResultType.Uri,
             source: CameraSource.Camera, // automatically take a new photo with the camera
             quality: 100
         });
 
-        console.log(capturedPhoto);
+        const response = await fetch(capturedPhoto.webPath);
+        const blob = await response.blob();
+        await this.getMetalInfo(blob);
+    }
 
+    private async getMetalInfo(imageBlob: Blob) {
 
+        const formData = new FormData();
+        formData.append('inspect', imageBlob, 'inspect.jpeg');
+
+        this.http.post(this.inspectUrl, formData).subscribe(
+            (res) => console.log(res),
+            (errRes) => {
+                console.log(errRes);
+              }
+          );
     }
 
 }
